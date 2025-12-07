@@ -1,13 +1,96 @@
 #!/usr/bin/env sh
 
 # Gradle start up script for UN*X
+# Simplified wrapper script recreated after truncation with dynamic JAR download.
 
-if [ -n "$JAVA_HOME" ] ; then
-    if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
-        exec "$JAVA_HOME/jre/sh/java" "$@"
-    else
-        exec "$JAVA_HOME/bin/java" "$@"
-    fi
-else
-    exec java "$@"
+set -e
+
+APP_NAME="Gradle"
+APP_BASE_NAME=${0##*/}
+
+# Resolve APP_HOME relative to this script, handling symlinks
+PRG="$0"
+while [ -h "$PRG" ]; do
+  ls=$(ls -ld "$PRG")
+  link=$(expr "$ls" : '.*-> \(.*\)$')
+  if expr "$link" : '/.*' > /dev/null; then
+    PRG="$link"
+  else
+    PRG="$(dirname "$PRG")/$link"
+  fi
+
+done
+SAVED="$(pwd)"
+cd "$(dirname "$PRG")/" >/dev/null
+APP_HOME="$(pwd -P)"
+cd "$SAVED" >/dev/null
+
+WRAPPER_DIR="$APP_HOME/gradle/wrapper"
+PROPERTIES_FILE="$WRAPPER_DIR/gradle-wrapper.properties"
+WRAPPER_MAIN="$WRAPPER_DIR/gradle-wrapper.jar"
+WRAPPER_SHARED="$WRAPPER_DIR/gradle-wrapper-shared.jar"
+
+read_property() {
+  PROP_NAME="$1"
+  if [ -f "$PROPERTIES_FILE" ]; then
+    sed -n "s/^$PROP_NAME=\\(.*\\)$/\\1/p" "$PROPERTIES_FILE" | tail -n 1
+  fi
+}
+
+DIST_URL=$(read_property distributionUrl)
+WRAPPER_VERSION=""
+if [ -n "$DIST_URL" ]; then
+  WRAPPER_VERSION=$(echo "$DIST_URL" | sed -e 's#^.*/gradle-##' -e 's/-bin\\.zip$//' -e 's/-all\\.zip$//' -e 's/\\.zip$//')
 fi
+
+WRAPPER_REPO_BASE="https://repo.gradle.org/gradle/libs-releases-local/org/gradle"
+
+fetch_wrapper_jar() {
+  TARGET="$1"
+  ARTIFACT="$2"
+  if [ -f "$TARGET" ]; then
+    return 0
+  fi
+  if [ -z "$WRAPPER_VERSION" ]; then
+    return 1
+  fi
+  URL="$WRAPPER_REPO_BASE/$ARTIFACT/$WRAPPER_VERSION/$ARTIFACT-$WRAPPER_VERSION.jar"
+  mkdir -p "$WRAPPER_DIR"
+  if command -v curl >/dev/null 2>&1; then
+    curl --fail --location --output "$TARGET" "$URL" || return 1
+  elif command -v wget >/dev/null 2>&1; then
+    wget -O "$TARGET" "$URL" || return 1
+  else
+    echo "ERROR: Neither curl nor wget is available to download $ARTIFACT." >&2
+    return 1
+  fi
+}
+
+fetch_wrapper_jar "$WRAPPER_MAIN" "gradle-wrapper" || true
+fetch_wrapper_jar "$WRAPPER_SHARED" "gradle-wrapper-shared" || true
+
+if [ ! -f "$WRAPPER_MAIN" ]; then
+  echo "ERROR: Gradle wrapper JAR is missing and could not be downloaded." >&2
+  exit 1
+fi
+
+if [ -f "$WRAPPER_SHARED" ]; then
+  CLASSPATH="$WRAPPER_MAIN:$WRAPPER_SHARED"
+else
+  CLASSPATH="$WRAPPER_MAIN"
+fi
+
+# Determine the Java command to use to start the JVM.
+if [ -n "$JAVA_HOME" ]; then
+  if [ -x "$JAVA_HOME/jre/sh/java" ]; then
+    JAVA_CMD="$JAVA_HOME/jre/sh/java"
+  else
+    JAVA_CMD="$JAVA_HOME/bin/java"
+  fi
+else
+  JAVA_CMD="java"
+fi
+
+DEFAULT_JVM_OPTS=""
+
+exec "$JAVA_CMD" $DEFAULT_JVM_OPTS -Dorg.gradle.appname="$APP_BASE_NAME" -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
