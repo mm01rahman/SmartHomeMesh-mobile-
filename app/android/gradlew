@@ -1,0 +1,13 @@
+#!/usr/bin/env sh
+
+# Gradle start up script for UN*X
+
+if [ -n "$JAVA_HOME" ] ; then
+    if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
+        exec "$JAVA_HOME/jre/sh/java" "$@"
+    else
+        exec "$JAVA_HOME/bin/java" "$@"
+    fi
+else
+    exec java "$@"
+fi
