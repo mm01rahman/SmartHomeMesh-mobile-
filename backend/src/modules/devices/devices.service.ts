@@ -28,6 +28,7 @@ export class DevicesService {
   async sendCommand(deviceId: number, userId: number, state: number) {
     const device = await this.prisma.device.findUnique({ where: { id: deviceId } });
     if (!device) throw new ForbiddenException('Device not found');
+    if (!device.homeId) throw new ForbiddenException('Device is not assigned to a home');
     await this.homesService.assertUserInHome(device.homeId, userId);
     const cmdPayload = { t: 'cmd', dev: `${device.nodeId}:${device.localId}`, st: state };
     const topic = `${process.env.MQTT_BASE_TOPIC || 'smarthome'}/${device.nodeId}/cmd`;

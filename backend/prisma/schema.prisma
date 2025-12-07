@@ -69,8 +69,8 @@ enum OnlineStatus {
 
 model Device {
   id           Int      @id @default(autoincrement())
-  home         Home     @relation(fields: [homeId], references: [id])
-  homeId       Int
+  home         Home?    @relation(fields: [homeId], references: [id])
+  homeId       Int?
   node         Node     @relation(fields: [nodeId], references: [nodeId])
   nodeId       String
   localId      String

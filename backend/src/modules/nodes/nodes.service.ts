@@ -21,7 +21,9 @@ export class NodesService {
 
   async claim(nodeId: string, homeId: number, userId: number) {
     await this.homesService.assertUserInHome(homeId, userId);
-    return this.prisma.node.update({ where: { nodeId }, data: { homeId } });
+    const node = await this.prisma.node.update({ where: { nodeId }, data: { homeId } });
+    await this.prisma.device.updateMany({ where: { nodeId }, data: { homeId } });
+    return node;
   }
 
   async upsertJoinPayload(payload: { node: string; devs: { id: string; type: string; label: string }[] }) {
@@ -33,10 +35,10 @@ export class NodesService {
     for (const dev of payload.devs) {
       await this.prisma.device.upsert({
         where: { nodeId_localId: { nodeId: payload.node, localId: dev.id } },
-        update: { type: dev.type as any, label: dev.label, homeId: node.homeId ?? 0 || node.homeId },
+        update: { type: dev.type as any, label: dev.label, homeId: node.homeId ?? undefined },
         create: {
           nodeId: payload.node,
-          homeId: node.homeId ?? (await this.ensureUnclaimedHome()),
+          homeId: node.homeId ?? undefined,
           localId: dev.id,
           type: dev.type as any,
           label: dev.label,
@@ -46,25 +48,24 @@ export class NodesService {
     return node;
   }
 
-  private async ensureUnclaimedHome() {
-    // For devices arriving before claim, place under placeholder home 0? Instead create dummy shared home? keep null by linking to node home once claimed
-    const placeholderHome = await this.prisma.home.upsert({
-      where: { id: 1 },
-      update: {},
-      create: { name: 'Unclaimed', timezone: 'UTC' },
-    });
-    return placeholderHome.id;
-  }
-
   async updateStatus(payload: { node: string; devs: { id: string; st: number }[] }) {
-    const node = await this.prisma.node.update({
+    const node = await this.prisma.node.upsert({
       where: { nodeId: payload.node },
-      data: { lastSeenAt: new Date(), onlineStatus: OnlineStatus.ONLINE },
+      update: { lastSeenAt: new Date(), onlineStatus: OnlineStatus.ONLINE },
+      create: { nodeId: payload.node, name: payload.node, lastSeenAt: new Date(), onlineStatus: OnlineStatus.ONLINE },
     });
     for (const dev of payload.devs) {
-      await this.prisma.device.updateMany({
-        where: { nodeId: payload.node, localId: dev.id },
-        data: { currentState: dev.st },
+      await this.prisma.device.upsert({
+        where: { nodeId_localId: { nodeId: payload.node, localId: dev.id } },
+        update: { currentState: dev.st },
+        create: {
+          nodeId: payload.node,
+          homeId: node.homeId ?? undefined,
+          localId: dev.id,
+          type: 'custom',
+          label: dev.id,
+          currentState: dev.st,
+        },
       });
     }
     return node;
