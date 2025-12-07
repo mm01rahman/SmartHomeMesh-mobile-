@@ -20,7 +20,7 @@ export class AutomationsService {
 
   async create(homeId: number, userId: number, data: any) {
     await this.homesService.assertUserInHome(homeId, userId);
-    return this.prisma.automation.create({ data: { ...data, homeId } });
+    return this.prisma.automation.create({ data: { ...data, homeId, ownerId: userId } });
   }
 
   async update(id: number, userId: number, data: any) {
@@ -40,7 +40,9 @@ export class AutomationsService {
       if (config?.minute === now.getMinutes()) {
         const actions: any[] = automation.actionsConfig as any;
         for (const action of actions) {
-          await this.devicesService.sendCommand(action.deviceId, automation.ownerId || 0, action.state);
+          if (!automation.ownerId) continue;
+          await this.homesService.assertUserInHome(automation.homeId, automation.ownerId);
+          await this.devicesService.sendCommand(action.deviceId, automation.ownerId, action.state);
         }
       }
     }
