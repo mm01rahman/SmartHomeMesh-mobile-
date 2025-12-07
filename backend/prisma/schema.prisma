@@ -1,0 +1,136 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  homes        HomeUser[]
+  scenes       Scene[]
+  automations  Automation[]
+}
+
+model Home {
+  id        Int        @id @default(autoincrement())
+  name      String
+  timezone  String
+  users     HomeUser[]
+  nodes     Node[]
+  devices   Device[]
+  rooms     Room[]
+  scenes    Scene[]
+  automations Automation[]
+}
+
+model HomeUser {
+  id      Int    @id @default(autoincrement())
+  home    Home   @relation(fields: [homeId], references: [id])
+  homeId  Int
+  user    User   @relation(fields: [userId], references: [id])
+  userId  Int
+  role    HomeRole
+
+  @@unique([homeId, userId])
+}
+
+enum HomeRole {
+  owner
+  admin
+  member
+  guest
+}
+
+model Node {
+  id            Int       @id @default(autoincrement())
+  home          Home?     @relation(fields: [homeId], references: [id])
+  homeId        Int?
+  nodeId        String    @unique
+  name          String
+  onlineStatus  OnlineStatus @default(UNKNOWN)
+  lastSeenAt    DateTime?
+  firmwareVersion String?
+  devices       Device[]
+}
+
+enum OnlineStatus {
+  ONLINE
+  OFFLINE
+  UNKNOWN
+}
+
+model Device {
+  id           Int      @id @default(autoincrement())
+  home         Home     @relation(fields: [homeId], references: [id])
+  homeId       Int
+  node         Node     @relation(fields: [nodeId], references: [nodeId])
+  nodeId       String
+  localId      String
+  type         DeviceType
+  label        String
+  room         Room?    @relation(fields: [roomId], references: [id])
+  roomId       Int?
+  currentState Int?
+  isEnabled    Boolean  @default(true)
+
+  @@unique([nodeId, localId])
+}
+
+enum DeviceType {
+  light
+  fan
+  socket
+  custom
+}
+
+model Room {
+  id      Int    @id @default(autoincrement())
+  home    Home   @relation(fields: [homeId], references: [id])
+  homeId  Int
+  name    String
+  icon    String?
+  order   Int     @default(0)
+  devices Device[]
+}
+
+model Scene {
+  id       Int      @id @default(autoincrement())
+  home     Home     @relation(fields: [homeId], references: [id])
+  homeId   Int
+  name     String
+  icon     String?
+  isActive Boolean  @default(true)
+  actions  SceneAction[]
+  owner    User?    @relation(fields: [ownerId], references: [id])
+  ownerId  Int?
+}
+
+model SceneAction {
+  id           Int     @id @default(autoincrement())
+  scene        Scene   @relation(fields: [sceneId], references: [id])
+  sceneId      Int
+  device       Device  @relation(fields: [deviceId], references: [id])
+  deviceId     Int
+  desiredState Int
+}
+
+model Automation {
+  id            Int      @id @default(autoincrement())
+  home          Home     @relation(fields: [homeId], references: [id])
+  homeId        Int
+  name          String
+  triggerType   String
+  triggerConfig Json
+  actionsConfig Json
+  isEnabled     Boolean  @default(true)
+  owner         User?    @relation(fields: [ownerId], references: [id])
+  ownerId       Int?
+}
