@@ -10,13 +10,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
       throw new Error('DATABASE_URL environment variable is not set.');
     }
 
+    // Use legacy `datasources` shape, and cast to any so TS stops complaining.
     super({
       datasources: {
         db: {
           url: databaseUrl,
         },
       },
-    });
+    } as any);
   }
 
   async onModuleInit() {

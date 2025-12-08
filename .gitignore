@@ -1,0 +1,6 @@
+backend/.env
+backend/node_modules/
+backend/dist/
+backend/package-lock.json
+backend/prisma/migrations
+.idea/workspace.xml
