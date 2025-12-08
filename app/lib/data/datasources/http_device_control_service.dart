@@ -15,6 +15,15 @@ class HttpDeviceControlService extends DeviceControlService {
   Stream<DeviceStateUpdate> get deviceStateStream => _controller.stream;
 
   @override
+  Stream<Map<String, dynamic>> get joinStream => const Stream.empty();
+
+  @override
+  Stream<Map<String, dynamic>> get statusStream => const Stream.empty();
+
+  @override
+  Stream<bool> get connectionStateStream => const Stream.empty();
+
+  @override
   Future<void> sendCommand(String fullDevId, int state) async {
     final uri = Uri.parse('http://$baseIp/cmd');
     await http.post(uri, body: jsonEncode({'dev': fullDevId, 'st': state}), headers: {'Content-Type': 'application/json'});

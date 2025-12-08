@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:smarthomemesh_app/core/utils/app_mode.dart';
 import 'package:smarthomemesh_app/data/datasources/http_device_control_service.dart';
 import 'package:smarthomemesh_app/data/datasources/mqtt_device_control_service.dart';
+import 'package:smarthomemesh_app/data/models/mqtt_broker_config.dart';
 import 'package:smarthomemesh_app/data/services/device_control_service.dart';
 
 class ConnectivityState {
@@ -93,7 +94,8 @@ class ConnectivityNotifier extends StateNotifier<ConnectivityState> {
 }
 
 final connectivityNotifierProvider = StateNotifierProvider<ConnectivityNotifier, ConnectivityState>((ref) {
-  final mqtt = MqttDeviceControlService('broker.hivemq.com');
+  final mqttConfig = MqttBrokerConfig(host: 'broker.hivemq.com', port: 8883, topicPrefix: 'smarthome');
+  final mqtt = MqttDeviceControlService(mqttConfig);
   final notifier = ConnectivityNotifier(mqttService: mqtt);
   notifier.init();
   return notifier;
