@@ -1,16 +1,18 @@
-import { Injectable } from '@nestjs/common';
-import { Cron, CronExpression, SchedulerRegistry } from '@nestjs/schedule';
+import { Injectable, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma.service';
 import { HomesService } from '../homes/homes.service';
 import { DevicesService } from '../devices/devices.service';
+import * as cronParser from 'cron-parser';
 
 @Injectable()
 export class AutomationsService {
+  private readonly logger = new Logger(AutomationsService.name);
+
   constructor(
     private prisma: PrismaService,
     private homesService: HomesService,
     private devicesService: DevicesService,
-    private scheduler: SchedulerRegistry,
   ) {}
 
   async list(homeId: number, userId: number) {
@@ -30,20 +32,25 @@ export class AutomationsService {
     return this.prisma.automation.update({ where: { id }, data });
   }
 
-  // Simple time-based cron to check enabled automations hourly
   @Cron(CronExpression.EVERY_MINUTE)
   async handleCron() {
-    const automations = await this.prisma.automation.findMany({ where: { isEnabled: true, triggerType: 'time' } });
     const now = new Date();
+    const automations = await this.prisma.automation.findMany({ where: { isEnabled: true, triggerType: 'cron' } });
     for (const automation of automations) {
-      const config: any = automation.triggerConfig;
-      if (config?.minute === now.getMinutes()) {
-        const actions: any[] = automation.actionsConfig as any;
-        for (const action of actions) {
-          if (!automation.ownerId) continue;
-          await this.homesService.assertUserInHome(automation.homeId, automation.ownerId);
-          await this.devicesService.sendCommand(action.deviceId, automation.ownerId, action.state);
+      try {
+        if (!automation.cron) continue;
+        const interval = cronParser.parseExpression(automation.cron, { currentDate: now });
+        const prev = interval.prev();
+        if (Math.abs(now.getTime() - prev.getTime()) <= 60000) {
+          const actions: any[] = automation.actionsConfig as any;
+          for (const action of actions) {
+            if (!automation.ownerId) continue;
+            await this.homesService.assertUserInHome(automation.homeId, automation.ownerId);
+            await this.devicesService.sendCommand(action.deviceId, automation.ownerId, action.state);
+          }
         }
+      } catch (err) {
+        this.logger.warn(`Automation ${automation.id} failed cron parse: ${err}`);
       }
     }
   }

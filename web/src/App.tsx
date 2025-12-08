@@ -1,33 +1,20 @@
-import { useEffect } from 'react';
-import ConnectivityBanner from './components/ConnectivityBanner';
+import { useEffect, useState } from 'react';
 import DashboardPage from './pages/DashboardPage';
-import { useConnectivityStore } from './state/connectivityStore';
-import { useDevicesStore } from './state/devicesStore';
-import { mqttClient } from './api/mqttClient';
+import LoginPage from './pages/LoginPage';
+import { useAuthStore } from './state/authStore';
+import './styles.css';
 
 function App() {
-  const { connectivityMode, setMqttConnected } = useConnectivityStore();
-  const { ingestJoin, ingestStatus } = useDevicesStore();
+  const { isAuthenticated } = useAuthStore();
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    mqttClient.onJoin(ingestJoin);
-    mqttClient.onStatus(ingestStatus);
-    mqttClient.onConnectionChange((connected) => setMqttConnected(connected));
+    setReady(true);
+  }, []);
 
-    mqttClient.connect().catch((err) => console.error('MQTT connect failed', err));
-    return () => {
-      mqttClient.disconnect();
-    };
-  }, [ingestJoin, ingestStatus, setMqttConnected]);
-
-  return (
-    <div className="app-shell">
-      <ConnectivityBanner mode={connectivityMode} />
-      <main>
-        <DashboardPage />
-      </main>
-    </div>
-  );
+  if (!ready) return null;
+  if (!isAuthenticated) return <LoginPage onSuccess={() => setReady(true)} />;
+  return <DashboardPage />;
 }
 
 export default App;

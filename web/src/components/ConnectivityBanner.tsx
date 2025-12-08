@@ -1,24 +1,15 @@
-import { ConnectivityMode } from '../types';
-
-const descriptions: Record<ConnectivityMode, string> = {
-  CLOUD_MQTT: 'Cloud MQTT connected. Real-time updates via broker.',
-  LAN_HTTP: 'LAN HTTP mode. Commands routed through STA IP.',
-  AP_MESH_HTTP: 'AP mesh HTTP mode. Controlling devices via ESP AP.',
-  OFFLINE: 'Offline. Commands will queue once connectivity returns.'
-};
+import React from 'react';
 
 interface Props {
-  mode: ConnectivityMode;
+  connected: boolean;
+  text: string;
 }
 
-const ConnectivityBanner = ({ mode }: Props) => {
+const ConnectivityBanner: React.FC<Props> = ({ connected, text }) => {
   return (
-    <div className="banner">
-      <div>
-        <strong>{mode.replace('_', ' ')}</strong>
-        <div className="small">{descriptions[mode]}</div>
-      </div>
-      <div className="small">ESP v2.0 mesh</div>
+    <div className={`banner ${connected ? 'online' : 'offline'}`}>
+      <span className="dot" />
+      <span>{text}</span>
     </div>
   );
 };

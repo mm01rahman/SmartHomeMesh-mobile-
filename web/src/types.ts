@@ -1,42 +1,50 @@
-export type DeviceType = 'light' | 'fan' | 'socket' | 'generic';
-
 export interface Device {
-  id: string;
-  type: DeviceType;
+  id: number;
+  nodeId: string;
+  localId: string;
+  type: string;
   label: string;
-  st: number;
+  firmwareLabel?: string;
+  roomId?: number | null;
+  homeId?: number | null;
+  currentState?: number | null;
 }
 
-export interface NodeInfo {
+export interface Node {
+  id: number;
   nodeId: string;
+  name: string;
+  onlineStatus: 'ONLINE' | 'OFFLINE' | 'UNKNOWN';
+  lastSeenAt?: string | null;
+  homeId?: number | null;
   devices: Device[];
 }
 
-export interface JoinPayload {
-  t: 'join';
-  node_id: string;
-  devs: Array<{ id: string; type: DeviceType; label: string; st: number }>;
+export interface Room {
+  id: number;
+  homeId: number;
+  name: string;
 }
 
-export interface StatusPayload {
-  node_id?: string;
-  devs: Array<{ id: string; st: number }>;
-}
-
-export interface CommandPayload {
-  dev: string;
-  st: number;
-}
-
-export type ConnectivityMode = 'CLOUD_MQTT' | 'LAN_HTTP' | 'AP_MESH_HTTP' | 'OFFLINE';
-
-export interface SceneAction {
-  dev: string;
-  st: number;
+export interface SceneActionDto {
+  deviceId: number;
+  desiredState: number;
 }
 
 export interface Scene {
-  id: string;
+  id: number;
+  homeId: number;
   name: string;
-  actions: SceneAction[];
+  actions: SceneActionDto[];
+}
+
+export interface Home {
+  id: number;
+  name: string;
+  timezone: string;
+}
+
+export interface AuthResponse {
+  accessToken: string;
+  refreshToken: string;
 }

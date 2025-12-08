@@ -1,31 +1,87 @@
-import DeviceTile from '../components/DeviceTile';
-import SceneButton from '../components/SceneButton';
-import { useDevicesStore, selectAllDevices } from '../state/devicesStore';
+import React, { useEffect, useMemo } from 'react';
+import { useDataStore } from '../state/dataStore';
+import { useAuthStore } from '../state/authStore';
+import { backendApi } from '../api/backend';
+import ConnectivityBanner from '../components/ConnectivityBanner';
+import { DeviceTable } from '../components/DeviceTable';
+import { ScenePanel } from '../components/ScenePanel';
+import { mqttClient } from '../api/mqttClient';
 
-const DashboardPage = () => {
-  const devices = useDevicesStore(selectAllDevices);
-  const scenes = useDevicesStore((s) => s.scenes);
+const DashboardPage: React.FC = () => {
+  const { homes, selectedHome, nodes, devices, scenes, selectHome, refreshHome, toggleDevice, activateScene, createScene } =
+    useDataStore();
+  const { logout } = useAuthStore();
+  const onlineCount = useMemo(() => nodes.filter((n) => n.onlineStatus === 'ONLINE').length, [nodes]);
+
+  useEffect(() => {
+    backendApi.listHomes().then((list) => {
+      useDataStore.setState({ homes: list });
+      if (!selectedHome && list.length) selectHome(list[0]);
+    });
+  }, [selectHome, selectedHome]);
+
+  useEffect(() => {
+    mqttClient.connect();
+    const offJoin = mqttClient.onJoin(() => selectedHome && refreshHome(selectedHome.id));
+    const offStatus = mqttClient.onStatus(() => selectedHome && refreshHome(selectedHome.id));
+    return () => {
+      offJoin();
+      offStatus();
+      mqttClient.disconnect();
+    };
+  }, [refreshHome, selectedHome]);
 
   return (
-    <div className="card">
-      <h2>Dashboard</h2>
-      <p className="small">
-        Live device state from ESP v2.0 mesh. JOIN messages populate the list; STATUS messages keep it fresh.
-      </p>
+    <div className="page">
+      <header className="top-bar">
+        <h1>SmartHomeMesh Admin</h1>
+        <div className="actions">
+          <select
+            value={selectedHome?.id || ''}
+            onChange={(e) => {
+              const home = homes.find((h) => h.id === Number(e.target.value));
+              if (home) selectHome(home);
+            }}
+          >
+            <option value="">Select home</option>
+            {homes.map((h) => (
+              <option key={h.id} value={h.id}>
+                {h.name}
+              </option>
+            ))}
+          </select>
+          <button className="btn" onClick={logout}>
+            Logout
+          </button>
+        </div>
+      </header>
 
-      <div className="device-grid">
-        {devices.length === 0 && <div className="small">No devices yet. Waiting for JOIN payloads.</div>}
-        {devices.map((device) => (
-          <DeviceTile key={device.id} device={device} />
-        ))}
-      </div>
+      <ConnectivityBanner connected={onlineCount > 0} text={`${onlineCount}/${nodes.length} nodes online`} />
 
-      <h3>Scenes</h3>
-      <div className="scene-row">
-        {scenes.map((scene) => (
-          <SceneButton key={scene.id} scene={scene} />
-        ))}
-      </div>
+      <section className="grid">
+        <div className="card">
+          <h3>Nodes</h3>
+          <ul>
+            {nodes.map((node) => {
+              const onCount = devices.filter((d) => d.nodeId === node.nodeId && d.currentState === 1).length;
+              return (
+                <li key={node.nodeId} className={node.onlineStatus === 'ONLINE' ? 'online' : 'offline'}>
+                  <strong>{node.name}</strong> ({node.nodeId}) – {node.devices.length} devices / {onCount} on
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        <div className="card">
+          <h3>Devices</h3>
+          <DeviceTable devices={devices} onToggle={toggleDevice} />
+        </div>
+
+        <div className="card">
+          <ScenePanel scenes={scenes} devices={devices} onActivate={activateScene} onCreate={(name, acts) => selectedHome && createScene(selectedHome.id, name, acts)} />
+        </div>
+      </section>
     </div>
   );
 };
