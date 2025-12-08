@@ -1,83 +1,32 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'providers/auth_provider.dart';
-import 'screens/auth_screen.dart';
-import 'screens/home_list_screen.dart';
-import 'screens/home_dashboard_screen.dart';
-import 'screens/room_detail_screen.dart';
-import 'screens/nodes_screen.dart';
-import 'screens/scenes_screen.dart';
+import 'package:smarthomemesh_app/core/router/app_router.dart';
+import 'package:smarthomemesh_app/core/theme/app_theme.dart';
+import 'package:smarthomemesh_app/data/datasources/local_cache_data_source.dart';
+import 'package:smarthomemesh_app/features/connectivity/application/connectivity_notifier.dart';
 
-void main() {
-  runApp(const ProviderScope(child: SmartHomeApp()));
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final cache = LocalCacheDataSource();
+  await cache.init();
+  runApp(ProviderScope(
+    overrides: [],
+    child: const SmartHomeMeshApp(),
+  ));
 }
 
-class SmartHomeApp extends ConsumerWidget {
-  const SmartHomeApp({super.key});
+class SmartHomeMeshApp extends ConsumerWidget {
+  const SmartHomeMeshApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final auth = ref.watch(authProvider);
-
-    final router = GoRouter(
-      initialLocation: '/auth',
-      refreshListenable: GoRouterRefreshStream(ref.watch(authProvider.notifier).stream),
-      redirect: (context, state) {
-        final loggedIn = auth.isAuthenticated;
-        final loggingIn = state.matchedLocation == '/auth';
-        if (!loggedIn && !loggingIn) return '/auth';
-        if (loggedIn && loggingIn) return '/homes';
-        return null;
-      },
-      routes: [
-        GoRoute(path: '/auth', builder: (context, state) => const AuthScreen()),
-        GoRoute(path: '/homes', builder: (context, state) => const HomeListScreen()),
-        GoRoute(
-          path: '/homes/:id',
-          builder: (context, state) =>
-              HomeDashboardScreen(homeId: int.parse(state.pathParameters['id']!)),
-        ),
-        GoRoute(
-          path: '/homes/:homeId/rooms/:roomId',
-          builder: (context, state) => RoomDetailScreen(
-            homeId: int.parse(state.pathParameters['homeId']!),
-            roomId: int.parse(state.pathParameters['roomId']!),
-          ),
-        ),
-        GoRoute(
-          path: '/homes/:homeId/nodes',
-          builder: (context, state) =>
-              NodesScreen(homeId: int.parse(state.pathParameters['homeId']!)),
-        ),
-        GoRoute(
-          path: '/homes/:homeId/scenes',
-          builder: (context, state) =>
-              ScenesScreen(homeId: int.parse(state.pathParameters['homeId']!)),
-        ),
-      ],
-    );
-
+    final router = ref.watch(routerProvider);
+    ref.watch(connectivityNotifierProvider); // bootstrap connectivity
     return MaterialApp.router(
-      title: 'SmartHomeMesh',
+      title: 'SmartHomeMesh – esp v2.0',
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
       routerConfig: router,
-      theme: ThemeData(colorSchemeSeed: Colors.blue, useMaterial3: true),
     );
-  }
-}
-
-class GoRouterRefreshStream extends ChangeNotifier {
-  GoRouterRefreshStream(Stream<dynamic> stream) {
-    _subscription = stream.asBroadcastStream().listen((_) => notifyListeners());
-  }
-
-  late final StreamSubscription<dynamic> _subscription;
-
-  @override
-  void dispose() {
-    _subscription.cancel();
-    super.dispose();
   }
 }
