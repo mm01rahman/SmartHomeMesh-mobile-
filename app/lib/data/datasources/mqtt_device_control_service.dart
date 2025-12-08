@@ -9,6 +9,7 @@ import 'package:smarthomemesh_app/data/services/device_control_service.dart';
 class MqttDeviceControlService extends DeviceControlService {
   final MqttServerClient _client;
   final _controller = StreamController<DeviceStateUpdate>.broadcast();
+  bool _subscribed = false;
 
   @override
   Stream<DeviceStateUpdate> get deviceStateStream => _controller.stream;
@@ -30,7 +31,21 @@ class MqttDeviceControlService extends DeviceControlService {
     }
   }
 
+  Future<bool> ensureConnected() async {
+    if (_client.connectionStatus?.state == MqttConnectionState.connected) {
+      return true;
+    }
+    try {
+      await connect();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   void _subscribe() {
+    if (_subscribed) return;
+    _subscribed = true;
     _client.subscribe('smarthome/status', MqttQos.atLeastOnce);
     _client.subscribe('smarthome/ack', MqttQos.atLeastOnce);
     _client.updates?.listen((messages) {

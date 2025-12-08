@@ -33,7 +33,14 @@ class ConnectivityStatusBanner extends ConsumerWidget {
         children: [
           Icon(Icons.cloud, color: _colorForMode(state.mode)),
           const SizedBox(width: 8),
-          Text(state.mode.label, style: Theme.of(context).textTheme.bodyMedium),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(state.mode.label, style: Theme.of(context).textTheme.bodyMedium),
+              if (state.description.isNotEmpty)
+                Text(state.description, style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ),
           const Spacer(),
           if (state.isChecking) const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
         ],
