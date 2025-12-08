@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:mqtt_client/mqtt_client.dart';
-import 'package:mqtt_client/mqtt_server_client.dart';
+import 'package:mqtt_client/mqtt_client.dart' as mqtt;
+import 'package:mqtt_client/mqtt_server_client.dart' as mqtt;
 import 'package:riverpod/riverpod.dart';
 import 'package:smarthomemesh_app/data/models/mqtt_broker_config.dart';
 import 'package:smarthomemesh_app/data/services/device_control_service.dart';
@@ -11,7 +11,7 @@ import 'package:smarthomemesh_app/data/services/device_control_service.dart';
 /// MQTT implementation speaking the esp v2.0 topic contract with TLS support.
 class MqttDeviceControlService extends DeviceControlService {
   final MqttBrokerConfig _config;
-  final MqttServerClient _client;
+  final mqtt.MqttServerClient _client;
   final _deviceUpdates = StreamController<DeviceStateUpdate>.broadcast();
   final _joinUpdates = StreamController<Map<String, dynamic>>.broadcast();
   final _statusUpdates = StreamController<Map<String, dynamic>>.broadcast();
@@ -30,8 +30,9 @@ class MqttDeviceControlService extends DeviceControlService {
   @override
   Stream<bool> get connectionStateStream => _connectionState.stream;
 
-  MqttDeviceControlService(this._config)
-      : _client = MqttServerClient.withPort(_config.host, _config.clientId, _config.port) {
+  MqttDeviceControlService(MqttBrokerConfig config)
+      : _config = config,
+        _client = mqtt.MqttServerClient.withPort(config.host, config.clientId, config.port) {
     _client.logging(on: false);
     _client.keepAlivePeriod = 30;
     _client.autoReconnect = true;
@@ -55,12 +56,12 @@ class MqttDeviceControlService extends DeviceControlService {
     _client.onAutoReconnect = () => _connectionState.add(false);
     _client.onAutoReconnected = () => _connectionState.add(true);
 
-    final connMessage = MqttConnectMessage()
+    final connMessage = mqtt.MqttConnectMessage()
         .withClientIdentifier(_config.clientId)
         .startClean()
         .withWillTopic(_config.lwtTopic)
         .withWillMessage(jsonEncode({'t': 'lwt', 'st': 'offline', 'node': _config.clientId}))
-        .withWillQos(MqttQos.atLeastOnce);
+        .withWillQos(mqtt.MqttQos.atLeastOnce);
     if (_config.username != null && _config.password != null) {
       connMessage.authenticateAs(_config.username!, _config.password!);
     }
@@ -80,7 +81,7 @@ class MqttDeviceControlService extends DeviceControlService {
   }
 
   Future<bool> ensureConnected() async {
-    if (_client.connectionStatus?.state == MqttConnectionState.connected) {
+    if (_client.connectionStatus?.state == mqtt.MqttConnectionState.connected) {
       return true;
     }
     try {
@@ -92,16 +93,16 @@ class MqttDeviceControlService extends DeviceControlService {
   }
 
   void _subscribe() {
-    if (_subscribed || _client.connectionStatus?.state != MqttConnectionState.connected) return;
+    if (_subscribed || _client.connectionStatus?.state != mqtt.MqttConnectionState.connected) return;
     _subscribed = true;
-    _client.subscribe(_config.statusTopic, MqttQos.atLeastOnce);
-    _client.subscribe(_config.ackTopic, MqttQos.atLeastOnce);
-    _client.subscribe(_config.joinTopic, MqttQos.atLeastOnce);
-    _client.subscribe('${_config.lwtTopic}/#', MqttQos.atLeastOnce);
+    _client.subscribe(_config.statusTopic, mqtt.MqttQos.atLeastOnce);
+    _client.subscribe(_config.ackTopic, mqtt.MqttQos.atLeastOnce);
+    _client.subscribe(_config.joinTopic, mqtt.MqttQos.atLeastOnce);
+    _client.subscribe('${_config.lwtTopic}/#', mqtt.MqttQos.atLeastOnce);
 
     _client.updates?.listen((messages) {
       for (final msg in messages) {
-        final recMess = msg.payload as MqttPublishMessage;
+        final recMess = msg.payload as mqtt.MqttPublishMessage;
         final payload = utf8.decode(recMess.payload.message);
         _handlePayload(msg.topic, payload);
       }
@@ -154,9 +155,9 @@ class MqttDeviceControlService extends DeviceControlService {
 
   @override
   Future<void> sendCommand(String fullDevId, int state) async {
-    final builder = MqttClientPayloadBuilder();
+    final builder = mqtt.MqttClientPayloadBuilder();
     builder.addUTF8String(jsonEncode({'t': 'cmd', 'dev': fullDevId, 'st': state}));
-    _client.publishMessage(_config.cmdTopic, MqttQos.exactlyOnce, builder.payload!);
+    _client.publishMessage(_config.cmdTopic, mqtt.MqttQos.exactlyOnce, builder.payload!);
   }
 
   void dispose() {
