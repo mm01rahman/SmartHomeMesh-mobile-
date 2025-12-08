@@ -25,17 +25,19 @@ class NodeRepository {
     }
 
     controlService.deviceStateStream.listen(_applyDeviceUpdate);
+    controlService.joinStream.listen(ingestJoin);
+    controlService.statusStream.listen(ingestStatus);
   }
 
   /// Handles JOIN payloads coming from MQTT.
   void ingestJoin(Map<String, dynamic> join) {
-    final nodeId = join['node'] as String?;
+    final nodeId = join['node'] as String? ?? join['node_id'] as String?;
     if (nodeId == null) return;
     final devs = join['devs'] as List<dynamic>? ?? [];
     final devices = DeviceModel.listFromJoin(nodeId, devs);
     final node = NodeModel(
       id: nodeId,
-      label: nodeId,
+      label: join['label'] as String? ?? nodeId,
       devices: devices,
       isOnline: true,
       lastSeen: DateTime.now(),
@@ -49,6 +51,13 @@ class NodeRepository {
     if (nodeId == null) return;
     final devs = status['devs'] as List<dynamic>? ?? [];
     final existing = _getNode(nodeId);
+
+    // Handle availability-only updates (e.g., LWT) even without device states.
+    if (devs.isEmpty && status.containsKey('online')) {
+      _updateAvailability(nodeId, status['online'] == true);
+      return;
+    }
+
     if (existing == null) return;
     final updatedDevices = existing.devices.map((d) {
       final update = devs.firstWhere((e) => e['id'] == d.localId, orElse: () => null);
@@ -57,7 +66,18 @@ class NodeRepository {
       }
       return d;
     }).toList();
-    final node = existing.copyWith(devices: updatedDevices, isOnline: true, lastSeen: DateTime.now());
+    final node = existing.copyWith(
+      devices: updatedDevices,
+      isOnline: true,
+      lastSeen: DateTime.now(),
+    );
+    _saveNode(node);
+  }
+
+  void _updateAvailability(String nodeId, bool isOnline) {
+    final existing = _getNode(nodeId);
+    if (existing == null) return;
+    final node = existing.copyWith(isOnline: isOnline, lastSeen: isOnline ? DateTime.now() : existing.lastSeen);
     _saveNode(node);
   }
 
