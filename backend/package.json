@@ -5,9 +5,13 @@
   "scripts": {
     "prebuild": "prisma generate",
     "build": "tsc -p tsconfig.json",
+    "prestart": "prisma generate",
     "start": "nest start",
+    "prestart:dev": "prisma generate",
     "start:dev": "nest start --watch",
+    "prestart:prod": "prisma generate",
     "start:prod": "node dist/main.js",
+    "postinstall": "prisma generate",
     "lint": "eslint . --ext .ts"
   },
   "dependencies": {
