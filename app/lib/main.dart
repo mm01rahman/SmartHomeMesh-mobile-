@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -25,7 +27,7 @@ class SmartHomeApp extends ConsumerWidget {
       refreshListenable: GoRouterRefreshStream(ref.watch(authProvider.notifier).stream),
       redirect: (context, state) {
         final loggedIn = auth.isAuthenticated;
-        final loggingIn = state.subloc == '/auth';
+        final loggingIn = state.matchedLocation == '/auth';
         if (!loggedIn && !loggingIn) return '/auth';
         if (loggedIn && loggingIn) return '/homes';
         return null;
@@ -35,22 +37,25 @@ class SmartHomeApp extends ConsumerWidget {
         GoRoute(path: '/homes', builder: (context, state) => const HomeListScreen()),
         GoRoute(
           path: '/homes/:id',
-          builder: (context, state) => HomeDashboardScreen(homeId: int.parse(state.params['id']!)),
+          builder: (context, state) =>
+              HomeDashboardScreen(homeId: int.parse(state.pathParameters['id']!)),
         ),
         GoRoute(
           path: '/homes/:homeId/rooms/:roomId',
           builder: (context, state) => RoomDetailScreen(
-            homeId: int.parse(state.params['homeId']!),
-            roomId: int.parse(state.params['roomId']!),
+            homeId: int.parse(state.pathParameters['homeId']!),
+            roomId: int.parse(state.pathParameters['roomId']!),
           ),
         ),
         GoRoute(
           path: '/homes/:homeId/nodes',
-          builder: (context, state) => NodesScreen(homeId: int.parse(state.params['homeId']!)),
+          builder: (context, state) =>
+              NodesScreen(homeId: int.parse(state.pathParameters['homeId']!)),
         ),
         GoRoute(
           path: '/homes/:homeId/scenes',
-          builder: (context, state) => ScenesScreen(homeId: int.parse(state.params['homeId']!)),
+          builder: (context, state) =>
+              ScenesScreen(homeId: int.parse(state.pathParameters['homeId']!)),
         ),
       ],
     );
@@ -60,5 +65,19 @@ class SmartHomeApp extends ConsumerWidget {
       routerConfig: router,
       theme: ThemeData(colorSchemeSeed: Colors.blue, useMaterial3: true),
     );
+  }
+}
+
+class GoRouterRefreshStream extends ChangeNotifier {
+  GoRouterRefreshStream(Stream<dynamic> stream) {
+    _subscription = stream.asBroadcastStream().listen((_) => notifyListeners());
+  }
+
+  late final StreamSubscription<dynamic> _subscription;
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
   }
 }
