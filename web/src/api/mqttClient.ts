@@ -1,4 +1,4 @@
-import { connect, IClientOptions, MqttClient as MQTTClient } from 'mqtt';
+import mqtt, { IClientOptions, MqttClient as MQTTClient } from 'mqtt';
 import { CommandPayload, JoinPayload, StatusPayload } from '../types';
 
 type MessageHandler<T> = (payload: T) => void;
@@ -45,7 +45,7 @@ class SmartHomeMqttClient {
       reconnectPeriod: 3000
     };
 
-    const client = connect(this.config.url, options);
+    const client = mqtt.connect(this.config.url, options);
     this.client = client;
 
     client.on('connect', () => {
