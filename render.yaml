@@ -3,16 +3,21 @@ services:
     name: smarthomemesh-backend
     env: node
     plan: free
-    path: backend
-    buildCommand: "npm install && npm run build"
-    startCommand: "npm run start:prod"
+
+    buildCommand: "cd backend && npm install && npm run build"
+    startCommand: "cd backend && npm run start:prod"
+
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 8080
+
+      # Database
       - key: DATABASE_URL
         sync: false
+
+      # JWT
       - key: JWT_ACCESS_SECRET
         sync: false
       - key: JWT_REFRESH_SECRET
@@ -21,6 +26,8 @@ services:
         value: 15m
       - key: JWT_REFRESH_EXPIRES_IN
         value: 7d
+
+      # MQTT
       - key: MQTT_HOST
         sync: false
       - key: MQTT_PORT
