@@ -3,7 +3,7 @@ services:
     name: smarthomemesh-backend
     env: node
     plan: free
-    rootDir: backend
+    rootDirectory: backend
     buildCommand: "npm install && npm run build"
     startCommand: "npm run start:prod"
     envVars:
