@@ -80,6 +80,8 @@ model Device {
   roomId       Int?
   currentState Int?
   isEnabled    Boolean  @default(true)
+  /// Back relation for SceneAction → Device
+  sceneActions SceneAction[]
 
   @@unique([nodeId, localId])
 }
