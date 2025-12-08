@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { ScenesService } from './scenes.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 
@@ -13,17 +13,16 @@ export class ScenesController {
   }
 
   @Post('homes/:homeId/scenes')
-  create(@Param('homeId') homeId: string, @Body() body: any, @Req() req: any) {
+  create(
+    @Param('homeId') homeId: string,
+    @Body() body: { name: string; icon?: string; actions?: { deviceId: number; desiredState: number }[] },
+    @Req() req: any,
+  ) {
     return this.scenesService.create(Number(homeId), req.user.sub, body);
   }
 
-  @Patch('scenes/:id')
-  update(@Param('id') id: string, @Body() body: any, @Req() req: any) {
-    return this.scenesService.update(Number(id), req.user.sub, body);
-  }
-
-  @Post('scenes/:id/run')
-  run(@Param('id') id: string, @Req() req: any) {
-    return this.scenesService.run(Number(id), req.user.sub);
+  @Post('scenes/:sceneId/activate')
+  run(@Param('sceneId') sceneId: string, @Req() req: any) {
+    return this.scenesService.run(Number(sceneId), req.user.sub);
   }
 }

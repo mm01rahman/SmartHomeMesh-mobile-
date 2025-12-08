@@ -1,77 +1,73 @@
 import mqtt, { IClientOptions, MqttClient as MQTTClient } from 'mqtt';
-import { CommandPayload, JoinPayload, StatusPayload } from '../types';
+import { Node, Device } from '../types';
 
-type MessageHandler<T> = (payload: T) => void;
+type JoinHandler = (payload: { node: string; devs: Device[] }) => void;
+type StatusHandler = (payload: { node: string; devs: { id: string; st: number }[] }) => void;
+type LwtHandler = (payload: { node: string; state: string }) => void;
 
 type ConnectivityHandler = (connected: boolean) => void;
 
-export interface MqttConfig {
-  url: string;
+interface Config {
+  host: string;
+  port: number;
+  protocol: 'wss' | 'ws' | 'mqtts' | 'mqtt';
   username?: string;
   password?: string;
   baseTopic?: string;
-  joinTopic?: string;
-  statusTopic?: string;
-  ackTopic?: string;
-  cmdTopic?: string;
 }
 
-const defaultConfig: Required<Omit<MqttConfig, 'username' | 'password'>> = {
-  url: 'wss://broker.example.com:8884/mqtt',
+const defaultConfig: Config = {
+  host: 'broker.example.com',
+  port: 8884,
+  protocol: 'wss',
   baseTopic: 'smarthome',
-  joinTopic: 'smarthome/join',
-  statusTopic: 'smarthome/status',
-  ackTopic: 'smarthome/ack',
-  cmdTopic: 'smarthome/cmd'
 };
 
-class SmartHomeMqttClient {
+class MeshMqttClient {
   private client?: MQTTClient;
-  private joinHandlers = new Set<MessageHandler<JoinPayload>>();
-  private statusHandlers = new Set<MessageHandler<StatusPayload>>();
-  private ackHandlers = new Set<MessageHandler<Record<string, unknown>>>();
+  private joinHandlers = new Set<JoinHandler>();
+  private statusHandlers = new Set<StatusHandler>();
+  private lwtHandlers = new Set<LwtHandler>();
   private connectionHandlers = new Set<ConnectivityHandler>();
-  private config: Required<MqttConfig>;
+  private readonly config: Config;
 
-  constructor(config?: MqttConfig) {
-    this.config = { ...defaultConfig, ...config } as Required<MqttConfig>;
+  constructor(config?: Partial<Config>) {
+    this.config = { ...defaultConfig, ...config } as Config;
   }
 
-  async connect(): Promise<void> {
+  connect() {
     if (this.client) return;
-    const options: IClientOptions = {
+    const opts: IClientOptions = {
+      host: this.config.host,
+      port: this.config.port,
+      protocol: this.config.protocol,
       username: this.config.username,
       password: this.config.password,
-      reconnectPeriod: 3000
+      reconnectPeriod: 5000,
+      clean: true,
     };
-
-    const client = mqtt.connect(this.config.url, options);
-    this.client = client;
-
-    client.on('connect', () => {
+    const base = this.config.baseTopic || 'smarthome';
+    this.client = mqtt.connect(opts);
+    this.client.on('connect', () => {
       this.connectionHandlers.forEach((cb) => cb(true));
-      client.subscribe([
-        this.config.joinTopic,
-        `${this.config.statusTopic}/#`,
-        this.config.ackTopic
-      ]);
+      this.client?.subscribe(`${base}/+/join`);
+      this.client?.subscribe(`${base}/+/status`);
+      this.client?.subscribe(`${base}/+/lwt`);
     });
-
-    client.on('reconnect', () => this.connectionHandlers.forEach((cb) => cb(false)));
-    client.on('close', () => this.connectionHandlers.forEach((cb) => cb(false)));
-
-    client.on('message', (topic, payload) => {
+    this.client.on('close', () => this.connectionHandlers.forEach((cb) => cb(false)));
+    this.client.on('reconnect', () => this.connectionHandlers.forEach((cb) => cb(false)));
+    this.client.on('message', (topic, payload) => {
+      const [, node, suffix] = topic.split('/');
+      if (suffix === 'lwt') {
+        this.lwtHandlers.forEach((cb) => cb({ node, state: payload.toString() }));
+        return;
+      }
       try {
         const data = JSON.parse(payload.toString());
-        if (topic.startsWith(this.config.joinTopic)) {
-          this.joinHandlers.forEach((cb) => cb(data as JoinPayload));
-        } else if (topic.startsWith(this.config.statusTopic)) {
-          this.statusHandlers.forEach((cb) => cb(data as StatusPayload));
-        } else if (topic.startsWith(this.config.ackTopic)) {
-          this.ackHandlers.forEach((cb) => cb(data));
-        }
+        if (suffix === 'join' && data.t === 'join') this.joinHandlers.forEach((cb) => cb(data));
+        if (suffix === 'status' && data.t === 'status') this.statusHandlers.forEach((cb) => cb(data));
       } catch (err) {
-        console.error('Failed to parse MQTT payload', err);
+        console.error('MQTT parse error', err);
       }
     });
   }
@@ -81,24 +77,19 @@ class SmartHomeMqttClient {
     this.client = undefined;
   }
 
-  publishCommand(cmd: CommandPayload) {
-    if (!this.client) throw new Error('MQTT client not connected');
-    this.client.publish(this.config.cmdTopic, JSON.stringify(cmd));
-  }
-
-  onJoin(handler: MessageHandler<JoinPayload>) {
+  onJoin(handler: JoinHandler) {
     this.joinHandlers.add(handler);
     return () => this.joinHandlers.delete(handler);
   }
 
-  onStatus(handler: MessageHandler<StatusPayload>) {
+  onStatus(handler: StatusHandler) {
     this.statusHandlers.add(handler);
     return () => this.statusHandlers.delete(handler);
   }
 
-  onAck(handler: MessageHandler<Record<string, unknown>>) {
-    this.ackHandlers.add(handler);
-    return () => this.ackHandlers.delete(handler);
+  onLwt(handler: LwtHandler) {
+    this.lwtHandlers.add(handler);
+    return () => this.lwtHandlers.delete(handler);
   }
 
   onConnectionChange(handler: ConnectivityHandler) {
@@ -107,4 +98,4 @@ class SmartHomeMqttClient {
   }
 }
 
-export const mqttClient = new SmartHomeMqttClient();
+export const mqttClient = new MeshMqttClient();

@@ -13,36 +13,36 @@ export class MqttService implements OnModuleInit {
     const options: IClientOptions = {
       host: process.env.MQTT_HOST,
       port: Number(process.env.MQTT_PORT || 8883),
-      protocol: 'mqtts',
+      protocol: process.env.MQTT_PROTOCOL as any || 'mqtts',
       username: process.env.MQTT_USERNAME,
       password: process.env.MQTT_PASSWORD,
       reconnectPeriod: 5000,
     };
+    const base = process.env.MQTT_BASE_TOPIC || 'smarthome';
     this.client = connect(options);
     this.client.on('connect', () => {
-      this.logger.log('Connected to HiveMQ');
-      const base = process.env.MQTT_BASE_TOPIC || 'smarthome';
+      this.logger.log('Connected to MQTT broker');
       this.client.subscribe(`${base}/+/join`);
       this.client.subscribe(`${base}/+/status`);
       this.client.subscribe(`${base}/+/lwt`);
     });
 
     this.client.on('message', async (topic, payload) => {
+      const [, nodeId, suffix] = topic.split('/');
       try {
+        if (suffix === 'lwt') {
+          await this.nodesService.updateLwt(nodeId, payload.toString() as any);
+          return;
+        }
         const data = JSON.parse(payload.toString());
-        const [, nodeId, suffix] = topic.split('/');
         if (suffix === 'join' && data.t === 'join') {
-          // JOIN packet from esp v2.0
           await this.nodesService.upsertJoinPayload(data);
         }
         if (suffix === 'status' && data.t === 'status') {
           await this.nodesService.updateStatus(data);
         }
-        if (suffix === 'lwt') {
-          await this.nodesService.updateLwt(nodeId, payload.toString() as any);
-        }
       } catch (err) {
-        this.logger.error('MQTT message handling failed', err as any);
+        this.logger.error(`MQTT handling failed for topic ${topic}: ${err}`);
       }
     });
 

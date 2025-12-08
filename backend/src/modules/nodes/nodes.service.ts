@@ -1,7 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { HomesService } from '../homes/homes.service';
-import { OnlineStatus } from '@prisma/client';
+import { OnlineStatus, DeviceType } from '@prisma/client';
+
+interface JoinPayload {
+  node: string;
+  devs: { id: string; type: string; label: string }[];
+}
+
+interface StatusPayload {
+  node: string;
+  devs: { id: string; st: number }[];
+}
 
 @Injectable()
 export class NodesService {
@@ -9,14 +19,16 @@ export class NodesService {
 
   async listForHome(homeId: number, userId: number) {
     await this.homesService.assertUserInHome(homeId, userId);
-    return this.prisma.node.findMany({ where: { homeId }, include: { devices: true } });
+    return this.prisma.node.findMany({
+      where: { homeId },
+      include: { devices: true },
+      orderBy: { nodeId: 'asc' },
+    });
   }
 
-  async getById(id: number, userId: number) {
-    const node = await this.prisma.node.findUnique({ where: { id } });
-    if (!node) return null;
-    if (node.homeId) await this.homesService.assertUserInHome(node.homeId, userId);
-    return node;
+  async getByHomeAndNode(homeId: number, nodeId: string, userId: number) {
+    await this.homesService.assertUserInHome(homeId, userId);
+    return this.prisma.node.findFirst({ where: { homeId, nodeId }, include: { devices: true } });
   }
 
   async claim(nodeId: string, homeId: number, userId: number) {
@@ -26,29 +38,34 @@ export class NodesService {
     return node;
   }
 
-  async upsertJoinPayload(payload: { node: string; devs: { id: string; type: string; label: string }[] }) {
+  async upsertJoinPayload(payload: JoinPayload) {
     const node = await this.prisma.node.upsert({
       where: { nodeId: payload.node },
-      update: { name: payload.node },
-      create: { nodeId: payload.node, name: payload.node },
+      update: { name: payload.node, onlineStatus: OnlineStatus.ONLINE, lastSeenAt: new Date() },
+      create: { nodeId: payload.node, name: payload.node, onlineStatus: OnlineStatus.ONLINE, lastSeenAt: new Date() },
     });
     for (const dev of payload.devs) {
       await this.prisma.device.upsert({
         where: { nodeId_localId: { nodeId: payload.node, localId: dev.id } },
-        update: { type: dev.type as any, label: dev.label, homeId: node.homeId ?? undefined },
+        update: {
+          type: (dev.type as DeviceType) ?? DeviceType.custom,
+          firmwareLabel: dev.label,
+          homeId: node.homeId ?? undefined,
+        },
         create: {
           nodeId: payload.node,
           homeId: node.homeId ?? undefined,
           localId: dev.id,
-          type: dev.type as any,
+          type: (dev.type as DeviceType) ?? DeviceType.custom,
           label: dev.label,
+          firmwareLabel: dev.label,
         },
       });
     }
     return node;
   }
 
-  async updateStatus(payload: { node: string; devs: { id: string; st: number }[] }) {
+  async updateStatus(payload: StatusPayload) {
     const node = await this.prisma.node.upsert({
       where: { nodeId: payload.node },
       update: { lastSeenAt: new Date(), onlineStatus: OnlineStatus.ONLINE },
@@ -57,13 +74,14 @@ export class NodesService {
     for (const dev of payload.devs) {
       await this.prisma.device.upsert({
         where: { nodeId_localId: { nodeId: payload.node, localId: dev.id } },
-        update: { currentState: dev.st },
+        update: { currentState: dev.st, homeId: node.homeId ?? undefined },
         create: {
           nodeId: payload.node,
           homeId: node.homeId ?? undefined,
           localId: dev.id,
-          type: 'custom',
+          type: DeviceType.custom,
           label: dev.id,
+          firmwareLabel: dev.id,
           currentState: dev.st,
         },
       });
@@ -74,7 +92,7 @@ export class NodesService {
   async updateLwt(nodeId: string, status: 'ONLINE' | 'OFFLINE') {
     return this.prisma.node.updateMany({
       where: { nodeId },
-      data: { onlineStatus: status as OnlineStatus },
+      data: { onlineStatus: status === 'ONLINE' ? OnlineStatus.ONLINE : OnlineStatus.OFFLINE },
     });
   }
 }

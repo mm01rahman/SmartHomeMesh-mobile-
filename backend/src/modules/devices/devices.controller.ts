@@ -17,9 +17,9 @@ export class DevicesController {
     return this.devicesService.update(Number(id), req.user.sub, body);
   }
 
-  @Post('devices/:id/command')
-  command(@Param('id') id: string, @Body() body: { state: number }, @Req() req: any) {
-    return this.devicesService.sendCommand(Number(id), req.user.sub, body.state);
+  @Post('devices/:id/toggle')
+  command(@Param('id') id: string, @Body() body: { state: boolean }, @Req() req: any) {
+    return this.devicesService.sendCommand(Number(id), req.user.sub, body.state ? 1 : 0);
   }
 
   @Post('commands/batch')
