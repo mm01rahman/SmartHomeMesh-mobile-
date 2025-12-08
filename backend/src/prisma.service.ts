@@ -10,7 +10,13 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
       throw new Error('DATABASE_URL environment variable is not set.');
     }
 
-    super();
+    super({
+      datasources: {
+        db: {
+          url: databaseUrl,
+        },
+      },
+    });
   }
 
   async onModuleInit() {
