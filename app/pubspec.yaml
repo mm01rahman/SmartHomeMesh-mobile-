@@ -14,6 +14,7 @@ dependencies:
   http: ^1.2.1
   mqtt_client: ^10.1.0
   connectivity_plus: ^6.0.3
+  network_info_plus: ^6.1.0
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   path_provider: ^2.1.2

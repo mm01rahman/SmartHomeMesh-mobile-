@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:network_info_plus/network_info_plus.dart';
 import 'package:smarthomemesh_app/core/utils/app_mode.dart';
 import 'package:smarthomemesh_app/data/datasources/http_device_control_service.dart';
 import 'package:smarthomemesh_app/data/datasources/mqtt_device_control_service.dart';
@@ -26,10 +27,15 @@ class ConnectivityState {
 class ConnectivityNotifier extends StateNotifier<ConnectivityState> {
   final MqttDeviceControlService mqttService;
   final HttpDeviceControlService httpService;
-  StreamSubscription? _sub;
+  final NetworkInfo _networkInfo;
+  StreamSubscription<List<ConnectivityResult>>? _sub;
 
-  ConnectivityNotifier({required this.mqttService, HttpDeviceControlService? httpService})
-      : httpService = httpService ?? HttpDeviceControlService(baseIp: '192.168.4.1'),
+  ConnectivityNotifier({
+    required this.mqttService,
+    HttpDeviceControlService? httpService,
+    NetworkInfo? networkInfo,
+  })  : httpService = httpService ?? HttpDeviceControlService(baseIp: '192.168.4.1'),
+        _networkInfo = networkInfo ?? NetworkInfo(),
         super(const ConnectivityState(mode: AppMode.offline));
 
   Future<void> init() async {
@@ -39,11 +45,12 @@ class ConnectivityNotifier extends StateNotifier<ConnectivityState> {
     _sub = Connectivity().onConnectivityChanged.listen(_onConnectivityChanged);
   }
 
-  Future<void> _onConnectivityChanged(ConnectivityResult result) async {
-    await _evaluateConnectivity(result);
+  Future<void> _onConnectivityChanged(List<ConnectivityResult> results) async {
+    await _evaluateConnectivity(results);
   }
 
-  Future<void> _evaluateConnectivity(ConnectivityResult connectivity) async {
+  Future<void> _evaluateConnectivity(List<ConnectivityResult> connectivityResults) async {
+    final connectivity = _primaryConnectivity(connectivityResults);
     if (connectivity == ConnectivityResult.none) {
       state = state.copyWith(mode: AppMode.offline, isChecking: false, description: 'No network');
       return;
@@ -70,10 +77,18 @@ class ConnectivityNotifier extends StateNotifier<ConnectivityState> {
 
   Future<String?> _safeWifiName() async {
     try {
-      return await Connectivity().getWifiName();
+      return await _networkInfo.getWifiName();
     } catch (_) {
       return null;
     }
+  }
+
+  ConnectivityResult _primaryConnectivity(List<ConnectivityResult> results) {
+    if (results.isEmpty) return ConnectivityResult.none;
+    if (results.contains(ConnectivityResult.wifi)) return ConnectivityResult.wifi;
+    if (results.contains(ConnectivityResult.ethernet)) return ConnectivityResult.ethernet;
+    if (results.contains(ConnectivityResult.mobile)) return ConnectivityResult.mobile;
+    return results.first;
   }
 
   DeviceControlService resolveTransport({String? espIp}) {
